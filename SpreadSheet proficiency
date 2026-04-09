@@ -1,0 +1,13 @@
+C.	Spreadsheet (Excel) Solutions
+----------------------------------
+1.	Populate ticket_created_at:
+    =XLOOKUP(A2, ticket!E:E, ticket!B:B)
+2a. Same day created & closed:
+     =COUNTIFS(created_at_range, ">="&A1,
+          created_at_range, "<"&A1+1,
+          closed_at_range, ">="&A1,
+          closed_at_range, "<"&A1+1)
+
+2b. Same hour:
+      =COUNTIFS(TEXT(created_at,"yyyy-mm-dd hh"),
+             TEXT(closed_at,"yyyy-mm-dd hh"))
