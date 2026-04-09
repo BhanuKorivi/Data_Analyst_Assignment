@@ -1,0 +1,130 @@
+A.	SQL – Hotel Management System
+1.	Last booked room for each user:
+SELECT b.user_id, b.room_no
+FROM bookings b
+WHERE b.booking_date = (
+    SELECT MAX(b2.booking_date)
+    FROM bookings b2
+    WHERE b2.user_id = b.user_id
+);
+
+2.	Booking_id & total billing (Nov 2021):
+SELECT bc.booking_id,
+       SUM(bc.item_quantity * i.item_rate) AS total_bill
+FROM booking_commercials bc
+JOIN items i ON bc.item_id = i.item_id
+WHERE MONTH(bc.bill_date) = 11 AND YEAR(bc.bill_date) = 2021
+GROUP BY bc.booking_id;
+
+3.	Bills in Oct 2021 with amount > 1000:
+SELECT bc.bill_id,
+       SUM(bc.item_quantity * i.item_rate) AS bill_amount
+FROM booking_commercials bc
+JOIN items i ON bc.item_id = i.item_id
+WHERE MONTH(bc.bill_date) = 10 AND YEAR(bc.bill_date) = 2021
+GROUP BY bc.bill_id
+HAVING SUM(bc.item_quantity * i.item_rate) > 1000;
+
+4.	Most & least ordered item each month (2021):
+WITH item_orders AS (
+    SELECT 
+        MONTH(bill_date) AS month,
+        item_id,
+        SUM(item_quantity) AS total_qty,
+        RANK() OVER (PARTITION BY MONTH(bill_date) ORDER BY SUM(item_quantity) DESC) AS rnk_desc,
+        RANK() OVER (PARTITION BY MONTH(bill_date) ORDER BY SUM(item_quantity) ASC) AS rnk_asc
+    FROM booking_commercials
+    WHERE YEAR(bill_date) = 2021
+    GROUP BY MONTH(bill_date), item_id
+)
+SELECT *
+FROM item_orders
+WHERE rnk_desc = 1 OR rnk_asc = 1;
+
+5.	Second highest bill customer each month:
+WITH monthly_bills AS (
+    SELECT 
+        MONTH(bc.bill_date) AS month,
+        b.user_id,
+        SUM(bc.item_quantity * i.item_rate) AS total_bill,
+        DENSE_RANK() OVER (
+            PARTITION BY MONTH(bc.bill_date)
+            ORDER BY SUM(bc.item_quantity * i.item_rate) DESC
+        ) AS rnk
+    FROM booking_commercials bc
+    JOIN bookings b ON bc.booking_id = b.booking_id
+    JOIN items i ON bc.item_id = i.item_id
+    WHERE YEAR(bc.bill_date) = 2021
+    GROUP BY MONTH(bc.bill_date), b.user_id
+)
+SELECT * FROM monthly_bills WHERE rnk = 2;
+
+B.	SQL – Clinic Management System
+1.	Revenue per sales channel
+SELECT sales_channel, SUM(amount) AS total_revenue
+FROM clinic_sales
+WHERE YEAR(datetime) = 2021
+GROUP BY sales_channel;
+
+2.	Top 10 valuable customers:
+SELECT uid, SUM(amount) AS total_spent
+FROM clinic_sales
+WHERE YEAR(datetime) = 2021
+GROUP BY uid
+ORDER BY total_spent DESC
+LIMIT 10;
+
+3.	Monthly revenue, expense, profit, status:
+WITH revenue AS (
+    SELECT MONTH(datetime) AS month, SUM(amount) AS revenue
+    FROM clinic_sales
+    WHERE YEAR(datetime) = 2021
+    GROUP BY MONTH(datetime)
+),
+expenses_cte AS (
+    SELECT MONTH(datetime) AS month, SUM(amount) AS expense
+    FROM expenses
+    WHERE YEAR(datetime) = 2021
+    GROUP BY MONTH(datetime)
+)
+SELECT r.month,
+       r.revenue,
+       e.expense,
+       (r.revenue - e.expense) AS profit,
+       CASE 
+           WHEN (r.revenue - e.expense) > 0 THEN 'Profitable'
+           ELSE 'Not Profitable'
+       END AS status
+FROM revenue r
+JOIN expenses_cte e ON r.month = e.month;
+
+4.	Most profitable clinic per city (given month):
+WITH profit_data AS (
+    SELECT 
+        c.city,
+        cs.cid,
+        SUM(cs.amount) - COALESCE(SUM(e.amount),0) AS profit,
+        RANK() OVER (PARTITION BY c.city ORDER BY SUM(cs.amount) DESC) AS rnk
+    FROM clinics c
+    JOIN clinic_sales cs ON c.cid = cs.cid
+    LEFT JOIN expenses e ON c.cid = e.cid
+    WHERE MONTH(cs.datetime) = 9 AND YEAR(cs.datetime) = 2021
+    GROUP BY c.city, cs.cid
+)
+SELECT * FROM profit_data WHERE rnk = 1;
+
+5.	Second least profitable clinic per state:
+WITH profit_data AS (
+    SELECT 
+        c.state,
+        cs.cid,
+        SUM(cs.amount) - COALESCE(SUM(e.amount),0) AS profit,
+        DENSE_RANK() OVER (PARTITION BY c.state ORDER BY SUM(cs.amount) ASC) AS rnk
+    FROM clinics c
+    JOIN clinic_sales cs ON c.cid = cs.cid
+    LEFT JOIN expenses e ON c.cid = e.cid
+    WHERE MONTH(cs.datetime) = 9 AND YEAR(cs.datetime) = 2021
+    GROUP BY c.state, cs.cid
+)
+SELECT * FROM profit_data WHERE rnk = 2;
+
