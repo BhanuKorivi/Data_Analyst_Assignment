@@ -1,4 +1,5 @@
 A.	SQL – Hotel Management System
+---------------------------------
 1.	Last booked room for each user:
 SELECT b.user_id, b.room_no
 FROM bookings b
@@ -60,6 +61,7 @@ WITH monthly_bills AS (
 SELECT * FROM monthly_bills WHERE rnk = 2;
 
 B.	SQL – Clinic Management System
+----------------------------------
 1.	Revenue per sales channel
 SELECT sales_channel, SUM(amount) AS total_revenue
 FROM clinic_sales
